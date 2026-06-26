@@ -1,8 +1,9 @@
-name: Scrape and Deploy
+name: Scrape and Deploy to GitHub Pages
 
 on:
   schedule:
-    - cron: "0 */6 * * *"
+    # 每天台灣時間 8:00, 14:00, 20:00 自動更新（UTC 0:00, 6:00, 12:00）
+    - cron: "0 0,6,12 * * *"
   workflow_dispatch:
     inputs:
       history_days:
@@ -21,6 +22,8 @@ concurrency:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
   scrape-deploy:
@@ -40,6 +43,9 @@ jobs:
       - name: Install dependencies
         run: npm ci || npm install
 
+      - name: Install Puppeteer browser
+        run: npx puppeteer browsers install chrome
+
       - name: Run metal scraper
         run: node scripts/scrape-metals.js ${{ github.event.inputs.history_days || '365' }}
 
@@ -50,22 +56,17 @@ jobs:
           git add public/data/metals.json
           if git diff --staged --quiet; then
             echo "No data changes"
-            exit 0
+          else
+            git commit -m "chore: update metal prices [$(date +'%Y-%m-%d %H:%M UTC')]"
+            for i in 1 2 3; do
+              git push && break
+              git pull --rebase
+            done
           fi
-          git commit -m "chore: update metal prices [$(date +'%Y-%m-%d %H:%M')]"
 
-      - name: Push changes
-        run: |
-          for i in 1 2 3; do
-            git push && break
-            git pull --rebase
-          done
-
-      - name: Deploy to Firebase Hosting
-        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
-        uses: FirebaseExtended/action-hosting-deploy@v0
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: metal-tracker-gepin
-          channelId: live
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+          force_orphan: false

@@ -109,9 +109,7 @@
     .card-title { flex: 1; }
     .card-name { font-size: 16px; font-weight: 700; color: #fff; }
     .card-name-en { font-size: 10px; color: #778899; }
-    .card-status {
-      width: 9px; height: 9px; border-radius: 50%; background: #444;
-    }
+    .card-status { width: 9px; height: 9px; border-radius: 50%; background: #444; }
     .card-status.loading { background: #f0a500; animation: pulse 1s infinite; }
     .card-status.success { background: #00c853; }
     .card-status.error { background: #ff5252; }
@@ -140,6 +138,17 @@
     }
     @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
     .status-bar { text-align: center; font-size: 11px; color: #556; margin-top: 12px; }
+    .info-box {
+      background: rgba(102,126,234,0.1);
+      border: 1px solid rgba(102,126,234,0.25);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 11px;
+      color: #99aacc;
+      margin-bottom: 12px;
+      line-height: 1.6;
+      text-align: center;
+    }
     @media (min-width: 768px) {
       .cards-grid { grid-template-columns: repeat(2, 1fr); max-width: 960px; margin: 0 auto; }
       body { padding-left: 20px; padding-right: 20px; }
@@ -156,8 +165,13 @@
     📱 可加入主畫面：瀏覽器選單 →「加入主畫面」或「安裝應用程式」
   </div>
 
+  <div class="info-box">
+    🤖 數據由 GitHub Actions 每天自動更新 3 次（台灣時間 8:00 / 14:00 / 20:00）<br>
+    按「重新載入」可取得最新快取數據
+  </div>
+
   <div class="toolbar">
-    <button class="btn btn-primary" id="refreshAllBtn" onclick="refreshAll()">🔄 更新所有價格</button>
+    <button class="btn btn-primary" id="refreshAllBtn" onclick="reloadData()">🔄 重新載入數據</button>
     <div class="range-group">
       <button class="btn-range active" id="range60" onclick="selectRange(60)">60天</button>
       <button class="btn-range" id="range180" onclick="selectRange(180)">半年</button>
@@ -169,12 +183,11 @@
     <div class="progress-bar" id="progressBar"></div>
   </div>
 
-  <div class="last-update" id="lastUpdate">尚未更新</div>
+  <div class="last-update" id="lastUpdate">載入中...</div>
   <div class="cards-grid" id="cardsGrid"></div>
-  <div class="status-bar" id="statusBar">開啟後自動載入，按更新可抓取最新價格</div>
+  <div class="status-bar" id="statusBar">正在載入數據...</div>
 
   <script>
-    const REFRESH_API = '/api/refresh';
     const COMMODITIES = [
       { id: 'copper',    name: '銅',         nameEn: 'Copper',          unit: 'USD/噸', color: '#CD7F32', icon: '🔶' },
       { id: 'aluminum',  name: '鋁',         nameEn: 'Aluminum',        unit: 'USD/噸', color: '#A8A9AD', icon: '⬜' },
@@ -184,7 +197,6 @@
     ];
 
     const RANGE_LABELS = { 60: '60天', 180: '半年', 365: '一年' };
-    let isFetching = false;
     let selectedRangeDays = 60;
     let loadedRangeDays = 0;
     const chartInstances = {};
@@ -201,24 +213,36 @@
     }
 
     async function loadData() {
+      const btn = document.getElementById('refreshAllBtn');
+      btn.disabled = true;
+      document.getElementById('progressContainer').className = 'progress-bar-container visible';
+      document.getElementById('progressBar').style.width = '30%';
+
       try {
         const res = await fetch(`data/metals.json?t=${Date.now()}`);
-        if (!res.ok) throw new Error('找不到資料檔');
+        if (!res.ok) throw new Error('找不到資料檔（metals.json）');
         const payload = await res.json();
+        document.getElementById('progressBar').style.width = '100%';
         applyPayload(payload);
-        document.getElementById('statusBar').textContent = '✅ 資料已載入';
+        document.getElementById('statusBar').textContent = '✅ 數據已載入';
       } catch (e) {
-        document.getElementById('statusBar').textContent = '尚無快取資料，請按「更新所有價格」';
+        document.getElementById('statusBar').textContent = '❌ 載入失敗：' + e.message;
+        COMMODITIES.forEach(c => {
+          const priceEl = document.getElementById(`price-${c.id}`);
+          if (priceEl) { priceEl.className = 'card-price error-text'; priceEl.textContent = '載入失敗'; }
+          const statusEl = document.getElementById(`status-${c.id}`);
+          if (statusEl) statusEl.className = 'card-status error';
+        });
       }
+
+      setTimeout(() => {
+        document.getElementById('progressContainer').className = 'progress-bar-container';
+      }, 1000);
+      btn.disabled = false;
     }
 
-    function applyResults(results, historyDays) {
-      if (!results || !results.length) return;
-      loadedRangeDays = Math.max(loadedRangeDays, historyDays);
-      results.forEach((data) => {
-        dataCache[data.id] = data;
-        updateCard(data.id, data);
-      });
+    async function reloadData() {
+      await loadData();
     }
 
     function applyPayload(payload) {
@@ -231,7 +255,7 @@
       if (payload.updatedAt) {
         const t = new Date(payload.updatedAt);
         document.getElementById('lastUpdate').textContent =
-          `最後更新：${t.toLocaleDateString('zh-TW')} ${t.toLocaleTimeString('zh-TW')} · 自動同步`;
+          `數據更新時間：${t.toLocaleDateString('zh-TW')} ${t.toLocaleTimeString('zh-TW')}`;
       }
     }
 
@@ -250,18 +274,17 @@
               <div class="card-name">${c.name}</div>
               <div class="card-name-en">${c.nameEn}</div>
             </div>
-            <div class="card-status" id="status-${c.id}"></div>
+            <div class="card-status loading" id="status-${c.id}"></div>
           </div>
           <div class="card-price-row">
-            <div class="card-price" id="price-${c.id}">--</div>
+            <div class="card-price" id="price-${c.id}"><div class="shimmer"></div></div>
             <div class="card-unit">${c.unit}</div>
           </div>
           <div class="card-date">
-            <span id="dateText-${c.id}">點擊更新以取得數據</span>
-            <button class="card-refresh-btn" id="refreshBtn-${c.id}" onclick="refreshAll()">↻ 更新</button>
+            <span id="dateText-${c.id}">載入中...</span>
           </div>
           <div class="chart-container" id="chartContainer-${c.id}">
-            <div class="chart-placeholder" id="chartPlaceholder-${c.id}">更新後顯示走勢圖</div>
+            <div class="chart-placeholder" id="chartPlaceholder-${c.id}">載入後顯示走勢圖</div>
             <canvas id="chart-${c.id}" style="display:none;"></canvas>
           </div>`;
         grid.appendChild(card);
@@ -275,15 +298,10 @@
       });
     }
 
-    function sliceHistory(history, days) {
-      if (!history || !history.length) return [];
-      return history.slice(-days);
-    }
-
     function getDisplayHistory(id) {
       const cached = dataCache[id];
       if (!cached || !cached.history) return [];
-      return sliceHistory(cached.history, selectedRangeDays);
+      return cached.history.slice(-selectedRangeDays);
     }
 
     function rerenderAllCharts() {
@@ -296,39 +314,20 @@
       });
     }
 
-    async function selectRange(days) {
-      if (isFetching || selectedRangeDays === days) return;
+    function selectRange(days) {
+      if (selectedRangeDays === days) return;
       selectedRangeDays = days;
       updateRangeButtons();
-      if (loadedRangeDays >= days && Object.keys(dataCache).length > 0) {
-        rerenderAllCharts();
-        document.getElementById('statusBar').textContent = `已切換為 ${RANGE_LABELS[days]} 走勢`;
-        return;
-      }
-      document.getElementById('statusBar').textContent = `正在取得 ${RANGE_LABELS[days]} 走勢資料...`;
-      await refreshAll(false);
-    }
-
-    function setCardLoading(id) {
-      const priceEl = document.getElementById(`price-${id}`);
-      const statusEl = document.getElementById(`status-${id}`);
-      const refreshBtn = document.getElementById(`refreshBtn-${id}`);
-      const dateText = document.getElementById(`dateText-${id}`);
-      priceEl.className = 'card-price';
-      priceEl.innerHTML = '<div class="shimmer"></div>';
-      statusEl.className = 'card-status loading';
-      if (refreshBtn) refreshBtn.disabled = true;
-      if (dateText) dateText.textContent = '載入中...';
+      rerenderAllCharts();
+      document.getElementById('statusBar').textContent = `已切換為 ${RANGE_LABELS[days]} 走勢`;
     }
 
     function updateCard(id, data) {
       const priceEl = document.getElementById(`price-${id}`);
       const statusEl = document.getElementById(`status-${id}`);
       const dateText = document.getElementById(`dateText-${id}`);
-      const refreshBtn = document.getElementById(`refreshBtn-${id}`);
       const commodity = COMMODITIES.find((c) => c.id === id);
       if (!priceEl) return;
-      if (refreshBtn) refreshBtn.disabled = false;
 
       if (data.price != null) {
         priceEl.className = 'card-price';
@@ -338,11 +337,11 @@
         dateText.textContent = data.date ? `數據日期：${data.date} · ${label}` : `最新數據 · ${label}`;
         const history = getDisplayHistory(id);
         if (history.length > 1) renderChart(id, history, commodity ? commodity.color : '#667eea');
-      } else if (data.error) {
+      } else {
         priceEl.className = 'card-price error-text';
         priceEl.textContent = '無法取得數據';
         statusEl.className = 'card-status error';
-        dateText.textContent = data.error;
+        dateText.textContent = data.error || '發生錯誤';
       }
     }
 
@@ -352,10 +351,7 @@
       if (!canvas) return;
       if (placeholder) placeholder.style.display = 'none';
       canvas.style.display = 'block';
-      if (chartInstances[id]) {
-        chartInstances[id].destroy();
-        delete chartInstances[id];
-      }
+      if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
       const ctx = canvas.getContext('2d');
       const gradient = ctx.createLinearGradient(0, 0, 0, 120);
       gradient.addColorStop(0, hexToRgba(color, 0.35));
@@ -366,25 +362,19 @@
           labels: history.map((h) => h.date),
           datasets: [{
             data: history.map((h) => h.price),
-            borderColor: color,
-            borderWidth: 1.5,
-            backgroundColor: gradient,
-            fill: true,
-            pointRadius: 0,
-            tension: 0.3
+            borderColor: color, borderWidth: 1.5,
+            backgroundColor: gradient, fill: true,
+            pointRadius: 0, tension: 0.3
           }]
         },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
+          responsive: true, maintainAspectRatio: false,
           plugins: {
             legend: { display: false },
             tooltip: {
-              mode: 'index',
-              intersect: false,
+              mode: 'index', intersect: false,
               backgroundColor: 'rgba(20,20,40,0.9)',
-              titleColor: '#aaa',
-              bodyColor: '#fff',
+              titleColor: '#aaa', bodyColor: '#fff',
               callbacks: {
                 title: (items) => items[0].label,
                 label: (item) => formatPrice(item.raw)
@@ -414,51 +404,6 @@
       if (price >= 10000) return price.toLocaleString('en-US', { maximumFractionDigits: 0 });
       if (price >= 1000) return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       return price.toFixed(2);
-    }
-
-    async function callRefreshApi() {
-      const res = await fetch(`${REFRESH_API}?days=${selectedRangeDays}`, { method: 'GET' });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || '更新失敗');
-      return data;
-    }
-
-    async function refreshAll(showLoading = true) {
-      if (isFetching) return;
-      isFetching = true;
-      const btn = document.getElementById('refreshAllBtn');
-      const rangeBtns = [60, 180, 365].map((d) => document.getElementById(`range${d}`));
-      btn.disabled = true;
-      btn.textContent = '⏳ 爬蟲更新中（約1~2分鐘）...';
-      rangeBtns.forEach((b) => { if (b) b.disabled = true; });
-      document.getElementById('progressContainer').className = 'progress-bar-container visible';
-      document.getElementById('progressBar').style.width = '15%';
-      document.getElementById('statusBar').textContent =
-        `正在從 MacroMicro 抓取最新資料（${RANGE_LABELS[selectedRangeDays]}）...`;
-      if (showLoading) COMMODITIES.forEach((c) => setCardLoading(c.id));
-
-      try {
-        document.getElementById('progressBar').style.width = '40%';
-        const data = await callRefreshApi();
-        applyResults(data.results, data.historyDays || selectedRangeDays);
-        const now = new Date();
-        document.getElementById('lastUpdate').textContent =
-          `最後更新：${now.toLocaleDateString('zh-TW')} ${now.toLocaleTimeString('zh-TW')} · ${RANGE_LABELS[selectedRangeDays]}`;
-        document.getElementById('progressBar').style.width = '100%';
-        document.getElementById('statusBar').textContent = `✅ 更新完成（${RANGE_LABELS[selectedRangeDays]}）`;
-      } catch (e) {
-        document.getElementById('statusBar').textContent =
-          '❌ 更新失敗：' + e.message;
-        try { await loadData(); } catch (_) {}
-      }
-
-      setTimeout(() => {
-        document.getElementById('progressContainer').className = 'progress-bar-container';
-      }, 1500);
-      btn.disabled = false;
-      btn.textContent = '🔄 更新所有價格';
-      rangeBtns.forEach((b) => { if (b) b.disabled = false; });
-      isFetching = false;
     }
 
     init();
