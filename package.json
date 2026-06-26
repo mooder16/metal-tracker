@@ -1,0 +1,58 @@
+{
+  "name": "metal-tracker",
+  "version": "1.0.0",
+  "description": "金屬與石油期貨價格追蹤器",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable",
+    "build:installer": "electron-builder --win nsis",
+    "scrape": "node scripts/scrape-metals.js 365",
+    "scrape:60": "node scripts/scrape-metals.js 60",
+    "deploy:hosting": "firebase deploy --only hosting --project metal-tracker-gepin"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "chart.js": "^4.5.1"
+  },
+  "devDependencies": {
+    "electron": "^42.4.1",
+    "electron-builder": "^25.1.8",
+    "puppeteer": "^23.11.1"
+  },
+  "build": {
+    "appId": "com.metaltracker.app",
+    "productName": "金屬期貨價格追蹤器",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "package.json",
+      "node_modules/chart.js/dist/chart.umd.min.js"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false,
+      "verifyUpdateCodeSignature": false
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.exe"
+    },
+    "nsis": {
+      "oneClick": true,
+      "artifactName": "${productName}-${version}-setup.exe"
+    }
+  }
+}

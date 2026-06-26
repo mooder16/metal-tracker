@@ -1,0 +1,32 @@
+node_modules/
+dist/
+.firebase/
+*.log
+build-log.txt
+deploy-log.txt
+firebase-debug.log
+firebase-debug.*.log
+.DS_Store
+Thumbs.db
+
+# Electron build artifacts
+out/
+
+# Local env
+.env
+.env.*
+
+# Puppeteer cache (local)
+.cache/
+
+# Large binary files - don't upload to GitHub
+electron-v*.zip
+*.exe
+*.dmg
+*.AppImage
+
+# Python helper scripts (local only)
+download_electron.py
+extract_electron.py
+fix_electron.py
+test_api.py

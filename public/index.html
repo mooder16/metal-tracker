@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="金屬追蹤">
+  <title>金屬期貨價格追蹤器</title>
+  <link rel="manifest" href="manifest.json">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: max(12px, env(safe-area-inset-top)) 12px max(20px, env(safe-area-inset-bottom));
+    }
+    .header { text-align: center; margin-bottom: 14px; }
+    .header h1 { font-size: 20px; font-weight: 700; color: #fff; }
+    .header p { font-size: 11px; color: #8899aa; margin-top: 4px; }
+    .install-hint {
+      display: none;
+      background: rgba(102,126,234,0.15);
+      border: 1px solid rgba(102,126,234,0.35);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 12px;
+      color: #ccd6ff;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+    .toolbar {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .btn {
+      width: 100%;
+      padding: 12px 16px;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff;
+    }
+    .btn-primary:disabled { opacity: 0.6; }
+    .range-group {
+      display: flex;
+      gap: 6px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      padding: 4px;
+    }
+    .btn-range {
+      flex: 1;
+      padding: 10px 8px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      background: transparent;
+      color: #99aabb;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .btn-range.active {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff;
+    }
+    .btn-range:disabled { opacity: 0.45; }
+    .last-update { font-size: 11px; color: #667; text-align: center; margin-bottom: 10px; }
+    .progress-bar-container {
+      height: 3px; background: rgba(255,255,255,0.1); border-radius: 2px;
+      margin-bottom: 10px; overflow: hidden; display: none;
+    }
+    .progress-bar-container.visible { display: block; }
+    .progress-bar {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      transition: width 0.4s ease;
+    }
+    .cards-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px;
+      padding: 14px;
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--card-color, #667eea);
+    }
+    .card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .card-icon { font-size: 22px; }
+    .card-title { flex: 1; }
+    .card-name { font-size: 16px; font-weight: 700; color: #fff; }
+    .card-name-en { font-size: 10px; color: #778899; }
+    .card-status {
+      width: 9px; height: 9px; border-radius: 50%; background: #444;
+    }
+    .card-status.loading { background: #f0a500; animation: pulse 1s infinite; }
+    .card-status.success { background: #00c853; }
+    .card-status.error { background: #ff5252; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .card-price-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+    .card-price { font-size: 28px; font-weight: 800; color: #fff; min-height: 36px; }
+    .card-price.error-text { font-size: 13px; color: #ff5252; font-weight: 400; }
+    .card-unit { font-size: 11px; color: #778899; }
+    .card-date {
+      font-size: 11px; color: #556677; margin-bottom: 8px;
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    }
+    .card-refresh-btn {
+      font-size: 11px; color: #aaa; background: rgba(255,255,255,0.08);
+      border: none; padding: 4px 10px; border-radius: 6px; cursor: pointer;
+    }
+    .chart-container { position: relative; height: 120px; }
+    .chart-placeholder {
+      height: 120px; display: flex; align-items: center; justify-content: center;
+      color: #556; font-size: 12px; border: 1px dashed rgba(255,255,255,0.08); border-radius: 8px;
+    }
+    .shimmer {
+      background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+      background-size: 200% 100%; animation: shimmer 1.5s infinite;
+      border-radius: 4px; height: 32px; width: 70%;
+    }
+    @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+    .status-bar { text-align: center; font-size: 11px; color: #556; margin-top: 12px; }
+    @media (min-width: 768px) {
+      .cards-grid { grid-template-columns: repeat(2, 1fr); max-width: 960px; margin: 0 auto; }
+      body { padding-left: 20px; padding-right: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📊 金屬期貨價格追蹤器</h1>
+    <p>數據來源：MacroMicro 財經M平方</p>
+  </div>
+
+  <div class="install-hint" id="installHint">
+    📱 可加入主畫面：瀏覽器選單 →「加入主畫面」或「安裝應用程式」
+  </div>
+
+  <div class="toolbar">
+    <button class="btn btn-primary" id="refreshAllBtn" onclick="refreshAll()">🔄 更新所有價格</button>
+    <div class="range-group">
+      <button class="btn-range active" id="range60" onclick="selectRange(60)">60天</button>
+      <button class="btn-range" id="range180" onclick="selectRange(180)">半年</button>
+      <button class="btn-range" id="range365" onclick="selectRange(365)">一年</button>
+    </div>
+  </div>
+
+  <div class="progress-bar-container" id="progressContainer">
+    <div class="progress-bar" id="progressBar"></div>
+  </div>
+
+  <div class="last-update" id="lastUpdate">尚未更新</div>
+  <div class="cards-grid" id="cardsGrid"></div>
+  <div class="status-bar" id="statusBar">開啟後自動載入，按更新可抓取最新價格</div>
+
+  <script>
+    const REFRESH_API = '/api/refresh';
+    const COMMODITIES = [
+      { id: 'copper',    name: '銅',         nameEn: 'Copper',          unit: 'USD/噸', color: '#CD7F32', icon: '🔶' },
+      { id: 'aluminum',  name: '鋁',         nameEn: 'Aluminum',        unit: 'USD/噸', color: '#A8A9AD', icon: '⬜' },
+      { id: 'stainless', name: '不鏽鋼',     nameEn: 'Stainless Steel', unit: 'CNY/噸', color: '#708090', icon: '🔩' },
+      { id: 'iron',      name: '鐵礦石',     nameEn: 'Iron Ore',        unit: 'CNY/噸', color: '#8B4513', icon: '⛏️' },
+      { id: 'oil',       name: '石油 (WTI)', nameEn: 'WTI Crude Oil',   unit: 'USD/桶', color: '#2F4F4F', icon: '🛢️' }
+    ];
+
+    const RANGE_LABELS = { 60: '60天', 180: '半年', 365: '一年' };
+    let isFetching = false;
+    let selectedRangeDays = 60;
+    let loadedRangeDays = 0;
+    const chartInstances = {};
+    const dataCache = {};
+
+    function init() {
+      renderCards();
+      loadData();
+      if (window.matchMedia('(display-mode: standalone)').matches) {
+        document.getElementById('installHint').style.display = 'none';
+      } else if (/iPhone|iPad|Android/i.test(navigator.userAgent)) {
+        document.getElementById('installHint').style.display = 'block';
+      }
+    }
+
+    async function loadData() {
+      try {
+        const res = await fetch(`data/metals.json?t=${Date.now()}`);
+        if (!res.ok) throw new Error('找不到資料檔');
+        const payload = await res.json();
+        applyPayload(payload);
+        document.getElementById('statusBar').textContent = '✅ 資料已載入';
+      } catch (e) {
+        document.getElementById('statusBar').textContent = '尚無快取資料，請按「更新所有價格」';
+      }
+    }
+
+    function applyResults(results, historyDays) {
+      if (!results || !results.length) return;
+      loadedRangeDays = Math.max(loadedRangeDays, historyDays);
+      results.forEach((data) => {
+        dataCache[data.id] = data;
+        updateCard(data.id, data);
+      });
+    }
+
+    function applyPayload(payload) {
+      if (!payload || !payload.commodities) return;
+      loadedRangeDays = payload.historyDays || 365;
+      Object.values(payload.commodities).forEach((data) => {
+        dataCache[data.id] = data;
+        updateCard(data.id, data);
+      });
+      if (payload.updatedAt) {
+        const t = new Date(payload.updatedAt);
+        document.getElementById('lastUpdate').textContent =
+          `最後更新：${t.toLocaleDateString('zh-TW')} ${t.toLocaleTimeString('zh-TW')} · 自動同步`;
+      }
+    }
+
+    function renderCards() {
+      const grid = document.getElementById('cardsGrid');
+      grid.innerHTML = '';
+      COMMODITIES.forEach((c) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.id = `card-${c.id}`;
+        card.style.setProperty('--card-color', c.color);
+        card.innerHTML = `
+          <div class="card-header">
+            <span class="card-icon">${c.icon}</span>
+            <div class="card-title">
+              <div class="card-name">${c.name}</div>
+              <div class="card-name-en">${c.nameEn}</div>
+            </div>
+            <div class="card-status" id="status-${c.id}"></div>
+          </div>
+          <div class="card-price-row">
+            <div class="card-price" id="price-${c.id}">--</div>
+            <div class="card-unit">${c.unit}</div>
+          </div>
+          <div class="card-date">
+            <span id="dateText-${c.id}">點擊更新以取得數據</span>
+            <button class="card-refresh-btn" id="refreshBtn-${c.id}" onclick="refreshAll()">↻ 更新</button>
+          </div>
+          <div class="chart-container" id="chartContainer-${c.id}">
+            <div class="chart-placeholder" id="chartPlaceholder-${c.id}">更新後顯示走勢圖</div>
+            <canvas id="chart-${c.id}" style="display:none;"></canvas>
+          </div>`;
+        grid.appendChild(card);
+      });
+    }
+
+    function updateRangeButtons() {
+      [60, 180, 365].forEach((days) => {
+        const btn = document.getElementById(`range${days}`);
+        if (btn) btn.classList.toggle('active', selectedRangeDays === days);
+      });
+    }
+
+    function sliceHistory(history, days) {
+      if (!history || !history.length) return [];
+      return history.slice(-days);
+    }
+
+    function getDisplayHistory(id) {
+      const cached = dataCache[id];
+      if (!cached || !cached.history) return [];
+      return sliceHistory(cached.history, selectedRangeDays);
+    }
+
+    function rerenderAllCharts() {
+      COMMODITIES.forEach((c) => {
+        const cached = dataCache[c.id];
+        if (cached && cached.price != null) {
+          const history = getDisplayHistory(c.id);
+          if (history.length > 1) renderChart(c.id, history, c.color);
+        }
+      });
+    }
+
+    async function selectRange(days) {
+      if (isFetching || selectedRangeDays === days) return;
+      selectedRangeDays = days;
+      updateRangeButtons();
+      if (loadedRangeDays >= days && Object.keys(dataCache).length > 0) {
+        rerenderAllCharts();
+        document.getElementById('statusBar').textContent = `已切換為 ${RANGE_LABELS[days]} 走勢`;
+        return;
+      }
+      document.getElementById('statusBar').textContent = `正在取得 ${RANGE_LABELS[days]} 走勢資料...`;
+      await refreshAll(false);
+    }
+
+    function setCardLoading(id) {
+      const priceEl = document.getElementById(`price-${id}`);
+      const statusEl = document.getElementById(`status-${id}`);
+      const refreshBtn = document.getElementById(`refreshBtn-${id}`);
+      const dateText = document.getElementById(`dateText-${id}`);
+      priceEl.className = 'card-price';
+      priceEl.innerHTML = '<div class="shimmer"></div>';
+      statusEl.className = 'card-status loading';
+      if (refreshBtn) refreshBtn.disabled = true;
+      if (dateText) dateText.textContent = '載入中...';
+    }
+
+    function updateCard(id, data) {
+      const priceEl = document.getElementById(`price-${id}`);
+      const statusEl = document.getElementById(`status-${id}`);
+      const dateText = document.getElementById(`dateText-${id}`);
+      const refreshBtn = document.getElementById(`refreshBtn-${id}`);
+      const commodity = COMMODITIES.find((c) => c.id === id);
+      if (!priceEl) return;
+      if (refreshBtn) refreshBtn.disabled = false;
+
+      if (data.price != null) {
+        priceEl.className = 'card-price';
+        priceEl.textContent = formatPrice(data.price);
+        statusEl.className = 'card-status success';
+        const label = RANGE_LABELS[selectedRangeDays] || `${selectedRangeDays}天`;
+        dateText.textContent = data.date ? `數據日期：${data.date} · ${label}` : `最新數據 · ${label}`;
+        const history = getDisplayHistory(id);
+        if (history.length > 1) renderChart(id, history, commodity ? commodity.color : '#667eea');
+      } else if (data.error) {
+        priceEl.className = 'card-price error-text';
+        priceEl.textContent = '無法取得數據';
+        statusEl.className = 'card-status error';
+        dateText.textContent = data.error;
+      }
+    }
+
+    function renderChart(id, history, color) {
+      const placeholder = document.getElementById(`chartPlaceholder-${id}`);
+      const canvas = document.getElementById(`chart-${id}`);
+      if (!canvas) return;
+      if (placeholder) placeholder.style.display = 'none';
+      canvas.style.display = 'block';
+      if (chartInstances[id]) {
+        chartInstances[id].destroy();
+        delete chartInstances[id];
+      }
+      const ctx = canvas.getContext('2d');
+      const gradient = ctx.createLinearGradient(0, 0, 0, 120);
+      gradient.addColorStop(0, hexToRgba(color, 0.35));
+      gradient.addColorStop(1, hexToRgba(color, 0.02));
+      chartInstances[id] = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: history.map((h) => h.date),
+          datasets: [{
+            data: history.map((h) => h.price),
+            borderColor: color,
+            borderWidth: 1.5,
+            backgroundColor: gradient,
+            fill: true,
+            pointRadius: 0,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              backgroundColor: 'rgba(20,20,40,0.9)',
+              titleColor: '#aaa',
+              bodyColor: '#fff',
+              callbacks: {
+                title: (items) => items[0].label,
+                label: (item) => formatPrice(item.raw)
+              }
+            }
+          },
+          scales: {
+            x: { display: false },
+            y: {
+              position: 'right',
+              grid: { color: 'rgba(255,255,255,0.05)' },
+              ticks: { color: '#556677', font: { size: 9 }, maxTicksLimit: 4 }
+            }
+          }
+        }
+      });
+    }
+
+    function hexToRgba(hex, alpha) {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      return `rgba(${r},${g},${b},${alpha})`;
+    }
+
+    function formatPrice(price) {
+      if (price >= 10000) return price.toLocaleString('en-US', { maximumFractionDigits: 0 });
+      if (price >= 1000) return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return price.toFixed(2);
+    }
+
+    async function callRefreshApi() {
+      const res = await fetch(`${REFRESH_API}?days=${selectedRangeDays}`, { method: 'GET' });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || '更新失敗');
+      return data;
+    }
+
+    async function refreshAll(showLoading = true) {
+      if (isFetching) return;
+      isFetching = true;
+      const btn = document.getElementById('refreshAllBtn');
+      const rangeBtns = [60, 180, 365].map((d) => document.getElementById(`range${d}`));
+      btn.disabled = true;
+      btn.textContent = '⏳ 爬蟲更新中（約1~2分鐘）...';
+      rangeBtns.forEach((b) => { if (b) b.disabled = true; });
+      document.getElementById('progressContainer').className = 'progress-bar-container visible';
+      document.getElementById('progressBar').style.width = '15%';
+      document.getElementById('statusBar').textContent =
+        `正在從 MacroMicro 抓取最新資料（${RANGE_LABELS[selectedRangeDays]}）...`;
+      if (showLoading) COMMODITIES.forEach((c) => setCardLoading(c.id));
+
+      try {
+        document.getElementById('progressBar').style.width = '40%';
+        const data = await callRefreshApi();
+        applyResults(data.results, data.historyDays || selectedRangeDays);
+        const now = new Date();
+        document.getElementById('lastUpdate').textContent =
+          `最後更新：${now.toLocaleDateString('zh-TW')} ${now.toLocaleTimeString('zh-TW')} · ${RANGE_LABELS[selectedRangeDays]}`;
+        document.getElementById('progressBar').style.width = '100%';
+        document.getElementById('statusBar').textContent = `✅ 更新完成（${RANGE_LABELS[selectedRangeDays]}）`;
+      } catch (e) {
+        document.getElementById('statusBar').textContent =
+          '❌ 更新失敗：' + e.message;
+        try { await loadData(); } catch (_) {}
+      }
+
+      setTimeout(() => {
+        document.getElementById('progressContainer').className = 'progress-bar-container';
+      }, 1500);
+      btn.disabled = false;
+      btn.textContent = '🔄 更新所有價格';
+      rangeBtns.forEach((b) => { if (b) b.disabled = false; });
+      isFetching = false;
+    }
+
+    init();
+  </script>
+</body>
+</html>
