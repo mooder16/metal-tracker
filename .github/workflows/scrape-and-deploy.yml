@@ -22,8 +22,6 @@ concurrency:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 jobs:
   scrape-deploy:
@@ -49,11 +47,16 @@ jobs:
       - name: Run metal scraper
         run: node scripts/scrape-metals.js ${{ github.event.inputs.history_days || '365' }}
 
+      - name: Sync public/ to docs/
+        run: |
+          mkdir -p docs/data
+          cp -r public/. docs/
+
       - name: Commit updated data
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add public/data/metals.json
+          git add public/data/metals.json docs/data/metals.json
           if git diff --staged --quiet; then
             echo "No data changes"
           else
@@ -63,10 +66,3 @@ jobs:
               git pull --rebase
             done
           fi
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
-          force_orphan: false
