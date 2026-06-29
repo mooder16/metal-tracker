@@ -1,0 +1,60 @@
+name: Scrape and Deploy to GitHub Pages
+
+on:
+  schedule:
+    - cron: "0 0,6,12 * * *"
+  workflow_dispatch:
+    inputs:
+      history_days:
+        description: "走勢天數"
+        required: true
+        default: "365"
+        type: choice
+        options:
+          - "60"
+          - "180"
+          - "365"
+
+concurrency:
+  group: metal-scrape
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  scrape-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Run metal scraper (Yahoo Finance - no browser needed)
+        run: node scripts/scrape-metals.js ${{ github.event.inputs.history_days || '365' }}
+
+      - name: Sync public/ to docs/
+        run: |
+          mkdir -p docs/data
+          cp -r public/. docs/
+
+      - name: Commit updated data
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add public/data/metals.json docs/data/metals.json
+          if git diff --staged --quiet; then
+            echo "No data changes"
+          else
+            git commit -m "chore: update metal prices [$(date +'%Y-%m-%d %H:%M UTC')]"
+            for i in 1 2 3; do
+              git push && break
+              git pull --rebase
+            done
+          fi
