@@ -34,14 +34,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
-          cache: npm
+          node-version: "22"
 
-      - name: Install dependencies
-        run: npm ci || npm install
-
-      - name: Install Puppeteer browser
-        run: npx puppeteer browsers install chrome
+      - name: Install puppeteer only
+        run: |
+          npm install puppeteer@23.11.1 --no-save
+          npx puppeteer browsers install chrome
 
       - name: Run metal scraper
         run: node scripts/scrape-metals.js ${{ github.event.inputs.history_days || '365' }}
