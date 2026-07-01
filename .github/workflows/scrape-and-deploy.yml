@@ -32,7 +32,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -47,7 +47,7 @@ jobs:
           mkdir -p docs/data
           cp -r public/. docs/
 
-      - name: Commit and push
+      - name: Commit and push (always latest)
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
@@ -55,10 +55,7 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes"
           else
-            git stash
-            git pull --rebase origin main
-            git stash pop
-            git add public/data/metals.json docs/data/metals.json
             git commit -m "chore: update metal prices [$(date +'%Y-%m-%d %H:%M UTC')]"
+            git pull origin main --rebase -X theirs
             git push origin main
           fi
