@@ -34,6 +34,9 @@ jobs:
           ref: main
           fetch-depth: 0
 
+      - name: Pull latest before scraping
+        run: git pull origin main
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -47,7 +50,7 @@ jobs:
           mkdir -p docs/data
           cp -r public/. docs/
 
-      - name: Commit and push (always latest)
+      - name: Commit and push
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
@@ -56,6 +59,5 @@ jobs:
             echo "No changes"
           else
             git commit -m "chore: update metal prices [$(date +'%Y-%m-%d %H:%M UTC')]"
-            git pull origin main --rebase -X theirs
             git push origin main
           fi
