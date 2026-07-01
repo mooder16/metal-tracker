@@ -51,18 +51,10 @@ jobs:
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          # Save scraped data
-          cp public/data/metals.json /tmp/metals_new.json
-          cp docs/data/metals.json /tmp/metals_docs_new.json
-          # Pull latest (may overwrite metals.json)
-          git pull origin main
-          # Restore our freshly scraped data
-          cp /tmp/metals_new.json public/data/metals.json
-          cp /tmp/metals_docs_new.json docs/data/metals.json
           git add public/data/metals.json docs/data/metals.json
           if git diff --staged --quiet; then
             echo "No changes"
           else
             git commit -m "chore: update metal prices [$(date +'%Y-%m-%d %H:%M UTC')]"
-            git push origin main
+            git push origin HEAD:main --force-with-lease
           fi
