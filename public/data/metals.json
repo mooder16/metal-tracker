@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-19T07:55:01.318Z",
+  "updatedAt": "2026-07-19T12:46:40.745Z",
   "historyDays": 365,
   "commodities": {
     "copper": {
@@ -4058,7 +4058,7 @@
         },
         {
           "date": "2026-07-17",
-          "price": 81.78
+          "price": 82.49
         }
       ],
       "historyDays": 365,
