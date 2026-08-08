@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-08T06:30:43.176Z",
+  "updatedAt": "2026-08-08T12:21:39.703Z",
   "historyDays": 365,
   "commodities": {
     "copper": {
@@ -4089,7 +4089,7 @@
       "unit": "USD/噸",
       "color": "#708090",
       "icon": "🔩",
-      "price": 1173,
+      "price": 1211,
       "date": "2026-08-07",
       "history": [
         {
