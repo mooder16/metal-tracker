@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-14T10:45:15.279Z",
+  "updatedAt": "2026-10-14T16:04:18.850Z",
   "historyDays": 365,
   "commodities": {
     "copper": {
@@ -9,7 +9,7 @@
       "unit": "USD/噸",
       "color": "#CD7F32",
       "icon": "🔶",
-      "price": 14845.91,
+      "price": 14698.2,
       "date": "2026-10-14",
       "history": [
         {
@@ -1018,7 +1018,7 @@
         },
         {
           "date": "2026-10-14",
-          "price": 14847.01
+          "price": 14697.1
         }
       ],
       "historyDays": 365,
@@ -1033,7 +1033,7 @@
       "unit": "USD/噸",
       "color": "#A8A9AD",
       "icon": "⬜",
-      "price": 3112.25,
+      "price": 3070.5,
       "date": "2026-10-14",
       "history": [
         {
@@ -2042,7 +2042,7 @@
         },
         {
           "date": "2026-10-14",
-          "price": 3112.25
+          "price": 3070.5
         }
       ],
       "historyDays": 365,
@@ -3077,7 +3077,7 @@
       "unit": "USD/桶",
       "color": "#2F4F4F",
       "icon": "🛢️",
-      "price": 95.3,
+      "price": 95.01,
       "date": "2026-10-14",
       "history": [
         {
@@ -4086,7 +4086,7 @@
         },
         {
           "date": "2026-10-14",
-          "price": 95.3
+          "price": 95.01
         }
       ],
       "historyDays": 365,
@@ -4101,7 +4101,7 @@
       "unit": "USD/噸",
       "color": "#708090",
       "icon": "🔩",
-      "price": 1318,
+      "price": 1322,
       "date": "2026-10-14",
       "history": [
         {
@@ -5110,7 +5110,7 @@
         },
         {
           "date": "2026-10-14",
-          "price": 1318
+          "price": 1322
         }
       ],
       "historyDays": 365,
